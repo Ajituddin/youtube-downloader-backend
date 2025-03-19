@@ -5,14 +5,29 @@ const { spawn } = require("child_process");
 const app = express();
 app.use(cors());
 
-const ytDlpPath = "yt-dlp.exe"; // Ensure yt-dlp.exe is in the same directory
+// Function to install yt-dlp if it's missing
+function installYtDlp() {
+    console.log("Checking for yt-dlp...");
+    const installProcess = spawn("pip", ["install", "--upgrade", "yt-dlp"]);
 
-// Update yt-dlp automatically
-function updateYtDlp() {
-    spawn(ytDlpPath, ["-U"]);
-    console.log("yt-dlp is being updated...");
+    installProcess.stdout.on("data", (data) => {
+        console.log(`yt-dlp install: ${data}`);
+    });
+
+    installProcess.stderr.on("data", (data) => {
+        console.error(`yt-dlp error: ${data}`);
+    });
+
+    installProcess.on("close", (code) => {
+        if (code === 0) {
+            console.log("yt-dlp installed successfully.");
+        } else {
+            console.error("yt-dlp installation failed.");
+        }
+    });
 }
-updateYtDlp();
+
+installYtDlp(); // Install yt-dlp when the server starts
 
 app.get("/download", (req, res) => {
     const videoURL = req.query.url;
@@ -23,8 +38,8 @@ app.get("/download", (req, res) => {
     res.setHeader("Content-Disposition", 'attachment; filename="video.mp4"');
     res.setHeader("Content-Type", "video/mp4");
 
-    // Stream the best MP4 video directly without saving (Faster)
-    const ytProcess = spawn(ytDlpPath, ["-f", "best[ext=mp4]", "-o", "-", videoURL]);
+    // Run yt-dlp from Python (without using .exe)
+    const ytProcess = spawn("yt-dlp", ["-f", "best[ext=mp4]", "-o", "-", videoURL]);
 
     ytProcess.stdout.pipe(res);
 
@@ -39,5 +54,5 @@ app.get("/download", (req, res) => {
     });
 });
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
